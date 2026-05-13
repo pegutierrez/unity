@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 
 const TABS = [
   { id: 'general', label: 'Información general' },
+  { id: 'integraciones', label: 'Integraciones' },
 ]
 
 export default function TabNav({ cuentaId }: { cuentaId: string }) {

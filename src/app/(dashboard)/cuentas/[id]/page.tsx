@@ -1,9 +1,10 @@
-import { ChevronLeft, Mail, Phone, MapPin, Users, CreditCard, Puzzle } from 'lucide-react'
+import { ChevronLeft, Mail, MapPin, Users, CreditCard, Puzzle } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
 import { Suspense } from 'react'
 import TabNav from './TabNav'
+import IntegracionesTab from './IntegracionesTab'
 
 const INTEGRACIONES_LABELS: Record<string, string> = {
   meta_ads: 'Meta Ads',
@@ -58,7 +59,12 @@ export default async function WorkspacePage({
 
   if (!cuenta) notFound()
 
-  const integraciones: string[] = cuenta.integraciones ?? []
+  const { data: integraciones } = await supabase
+    .from('integraciones')
+    .select('*')
+    .eq('cuenta_id', id)
+
+  const integsSeleccionadas: string[] = cuenta.integraciones ?? []
   const colaboradores: string[] = cuenta.colaboradores ?? []
 
   const estadoStyles: Record<string, string> = {
@@ -96,6 +102,10 @@ export default async function WorkspacePage({
       <Suspense>
         <TabNav cuentaId={id} />
       </Suspense>
+
+      {tab === 'integraciones' && (
+        <IntegracionesTab cuentaId={id} integraciones={integraciones ?? []} />
+      )}
 
       {tab === 'general' && (
         <div className="grid grid-cols-2 gap-4">
@@ -144,9 +154,9 @@ export default async function WorkspacePage({
           </Section>
 
           <Section icon={Puzzle} title="Integraciones">
-            {integraciones.length > 0 ? (
+            {integsSeleccionadas.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {integraciones.map((key: string) => (
+                {integsSeleccionadas.map((key: string) => (
                   <span key={key} className="px-2.5 py-1 bg-accent/5 text-accent text-xs font-medium rounded-md border border-accent/20">
                     {INTEGRACIONES_LABELS[key] ?? key}
                   </span>
