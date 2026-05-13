@@ -1,8 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, TrendingUp, TrendingDown, ChevronRight, X } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 type Estado = 'activo' | 'pausado' | 'inactivo'
 
@@ -10,20 +11,12 @@ interface Cuenta {
   id: string
   nombre: string
   contacto: string
-  planMensual: number
-  adSpend: number
+  plan_mensual: number
+  ad_spend: number
   roi: number
   roas: number
   estado: Estado
 }
-
-const mockCuentas: Cuenta[] = [
-  { id: '1', nombre: 'Café Colón', contacto: 'María González', planMensual: 1200, adSpend: 4800, roi: 3.8, roas: 4.2, estado: 'activo' },
-  { id: '2', nombre: 'Deportivos Línea', contacto: 'Carlos Méndez', planMensual: 2500, adSpend: 9200, roi: 4.1, roas: 5.1, estado: 'activo' },
-  { id: '3', nombre: 'Hotel Buena Vista', contacto: 'Ana Torres', planMensual: 800, adSpend: 2100, roi: 2.9, roas: 3.4, estado: 'activo' },
-  { id: '4', nombre: 'Tech Solutions CR', contacto: 'Roberto Jiménez', planMensual: 3500, adSpend: 12400, roi: 5.2, roas: 6.1, estado: 'activo' },
-  { id: '5', nombre: 'Moda Elegante', contacto: 'Laura Vargas', planMensual: 1800, adSpend: 5900, roi: 2.1, roas: 2.8, estado: 'pausado' },
-]
 
 function usd(n: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n)
@@ -59,30 +52,48 @@ function initials(nombre: string) {
 
 export default function CuentasPage() {
   const router = useRouter()
-  const [cuentas, setCuentas] = useState<Cuenta[]>(mockCuentas)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ nombre: '', contacto: '', planMensual: '' })
-  const [saving, setSaving] = useState(false)
+  const supabase = createClient()
 
-  function handleCreate(e: React.FormEvent) {
+  const [cuentas, setCuentas] = useState<Cuenta[]>([])
+  const [loading, setLoading] = useState(true)
+  const [modalOpen, setModalOpen] = useState(false)
+  const [form, setForm] = useState({ nombre: '', contacto: '', plan_mensual: '' })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      const { data } = await supabase
+        .from('cuentas')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (data) setCuentas(data)
+      setLoading(false)
+    }
+    load()
+  }, [])
+
+  async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    setTimeout(() => {
-      const nueva: Cuenta = {
-        id: String(Date.now()),
-        nombre: form.nombre,
-        contacto: form.contacto,
-        planMensual: Number(form.planMensual),
-        adSpend: 0,
-        roi: 0,
-        roas: 0,
-        estado: 'activo',
-      }
-      setCuentas((prev) => [nueva, ...prev])
-      setForm({ nombre: '', contacto: '', planMensual: '' })
-      setModalOpen(false)
+    setError('')
+
+    const { data, error } = await supabase
+      .from('cuentas')
+      .insert({ nombre: form.nombre, contacto: form.contacto, plan_mensual: Number(form.plan_mensual) })
+      .select()
+      .single()
+
+    if (error) {
+      setError('No se pudo crear la cuenta. Intenta de nuevo.')
       setSaving(false)
-    }, 400)
+      return
+    }
+
+    setCuentas((prev) => [data, ...prev])
+    setForm({ nombre: '', contacto: '', plan_mensual: '' })
+    setModalOpen(false)
+    setSaving(false)
   }
 
   return (
@@ -90,7 +101,9 @@ export default function CuentasPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-ink">Cuentas</h1>
-          <p className="text-sm text-ink-muted mt-0.5">{cuentas.length} clientes</p>
+          <p className="text-sm text-ink-muted mt-0.5">
+            {loading ? 'Cargando...' : `${cuentas.length} clientes`}
+          </p>
         </div>
         <button
           onClick={() => setModalOpen(true)}
@@ -102,50 +115,64 @@ export default function CuentasPage() {
       </div>
 
       <div className="bg-panel border border-separator rounded-lg overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-separator">
-              <th className="text-left text-xs font-medium text-ink-muted px-5 py-3">Cliente</th>
-              <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">Plan mensual</th>
-              <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">Ad spend</th>
-              <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">ROI</th>
-              <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">ROAS</th>
-              <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">Estado</th>
-              <th className="w-10" />
-            </tr>
-          </thead>
-          <tbody>
-            {cuentas.map((cuenta, i) => (
-              <tr
-                key={cuenta.id}
-                onClick={() => router.push(`/cuentas/${cuenta.id}`)}
-                className={`cursor-pointer hover:bg-canvas transition-colors group ${
-                  i < cuentas.length - 1 ? 'border-b border-separator' : ''
-                }`}
-              >
-                <td className="px-5 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-accent/10 text-accent text-xs font-semibold flex items-center justify-center shrink-0">
-                      {initials(cuenta.nombre)}
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-ink">{cuenta.nombre}</p>
-                      <p className="text-xs text-ink-muted">{cuenta.contacto}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-5 py-4 text-right text-sm text-ink">{usd(cuenta.planMensual)}</td>
-                <td className="px-5 py-4 text-right text-sm text-ink">{usd(cuenta.adSpend)}</td>
-                <td className="px-5 py-4 text-right"><RoiCell value={cuenta.roi} /></td>
-                <td className="px-5 py-4 text-right text-sm text-ink">{cuenta.roas.toFixed(1)}x</td>
-                <td className="px-5 py-4 text-right"><EstadoBadge estado={cuenta.estado} /></td>
-                <td className="px-3 py-4 text-ink-muted group-hover:text-ink transition-colors">
-                  <ChevronRight size={15} />
-                </td>
+        {loading ? (
+          <div className="py-16 text-center text-sm text-ink-muted">Cargando cuentas...</div>
+        ) : cuentas.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-sm text-ink-muted">No hay cuentas aún.</p>
+            <button
+              onClick={() => setModalOpen(true)}
+              className="mt-3 text-sm text-accent hover:underline"
+            >
+              Crear la primera cuenta
+            </button>
+          </div>
+        ) : (
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-separator">
+                <th className="text-left text-xs font-medium text-ink-muted px-5 py-3">Cliente</th>
+                <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">Plan mensual</th>
+                <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">Ad spend</th>
+                <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">ROI</th>
+                <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">ROAS</th>
+                <th className="text-right text-xs font-medium text-ink-muted px-5 py-3">Estado</th>
+                <th className="w-10" />
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {cuentas.map((cuenta, i) => (
+                <tr
+                  key={cuenta.id}
+                  onClick={() => router.push(`/cuentas/${cuenta.id}`)}
+                  className={`cursor-pointer hover:bg-canvas transition-colors group ${
+                    i < cuentas.length - 1 ? 'border-b border-separator' : ''
+                  }`}
+                >
+                  <td className="px-5 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-accent/10 text-accent text-xs font-semibold flex items-center justify-center shrink-0">
+                        {initials(cuenta.nombre)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-ink">{cuenta.nombre}</p>
+                        <p className="text-xs text-ink-muted">{cuenta.contacto}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-5 py-4 text-right text-sm text-ink">{usd(cuenta.plan_mensual)}</td>
+                  <td className="px-5 py-4 text-right text-sm text-ink">{usd(cuenta.ad_spend)}</td>
+                  <td className="px-5 py-4 text-right"><RoiCell value={cuenta.roi} /></td>
+                  <td className="px-5 py-4 text-right text-sm text-ink">{cuenta.roas.toFixed(1)}x</td>
+                  <td className="px-5 py-4 text-right"><EstadoBadge estado={cuenta.estado} /></td>
+                  <td className="px-3 py-4 text-ink-muted group-hover:text-ink transition-colors">
+                    <ChevronRight size={15} />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {modalOpen && (
@@ -153,10 +180,7 @@ export default function CuentasPage() {
           <div className="bg-panel border border-separator rounded-xl shadow-xl w-full max-w-md mx-4">
             <div className="flex items-center justify-between px-6 py-4 border-b border-separator">
               <h2 className="text-base font-semibold text-ink">Nueva cuenta</h2>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="text-ink-muted hover:text-ink transition-colors"
-              >
+              <button onClick={() => setModalOpen(false)} className="text-ink-muted hover:text-ink transition-colors">
                 <X size={18} />
               </button>
             </div>
@@ -189,12 +213,13 @@ export default function CuentasPage() {
                   type="number"
                   required
                   min="0"
-                  value={form.planMensual}
-                  onChange={(e) => setForm((f) => ({ ...f, planMensual: e.target.value }))}
+                  value={form.plan_mensual}
+                  onChange={(e) => setForm((f) => ({ ...f, plan_mensual: e.target.value }))}
                   placeholder="1200"
                   className="w-full px-3 py-2 text-sm bg-canvas border border-separator rounded-md text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition"
                 />
               </div>
+              {error && <p className="text-sm text-danger">{error}</p>}
               <div className="flex gap-3 pt-1">
                 <button
                   type="button"
