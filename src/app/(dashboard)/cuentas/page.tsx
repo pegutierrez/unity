@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Plus, TrendingUp, TrendingDown, ChevronRight, X } from 'lucide-react'
+import { Plus, TrendingUp, TrendingDown, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Estado = 'activo' | 'pausado' | 'inactivo'
@@ -56,10 +56,6 @@ export default function CuentasPage() {
 
   const [cuentas, setCuentas] = useState<Cuenta[]>([])
   const [loading, setLoading] = useState(true)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [form, setForm] = useState({ nombre: '', contacto: '', plan_mensual: '' })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -73,29 +69,6 @@ export default function CuentasPage() {
     load()
   }, [])
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    setError('')
-
-    const { data, error } = await supabase
-      .from('cuentas')
-      .insert({ nombre: form.nombre, contacto: form.contacto, plan_mensual: Number(form.plan_mensual) })
-      .select()
-      .single()
-
-    if (error) {
-      setError('No se pudo crear la cuenta. Intenta de nuevo.')
-      setSaving(false)
-      return
-    }
-
-    setCuentas((prev) => [data, ...prev])
-    setForm({ nombre: '', contacto: '', plan_mensual: '' })
-    setModalOpen(false)
-    setSaving(false)
-  }
-
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-6">
@@ -106,7 +79,7 @@ export default function CuentasPage() {
           </p>
         </div>
         <button
-          onClick={() => setModalOpen(true)}
+          onClick={() => router.push('/cuentas/nueva')}
           className="flex items-center gap-1.5 px-3.5 py-2 bg-accent hover:bg-accent-hover text-white text-sm font-medium rounded-md transition-colors"
         >
           <Plus size={15} />
@@ -121,7 +94,7 @@ export default function CuentasPage() {
           <div className="py-16 text-center">
             <p className="text-sm text-ink-muted">No hay cuentas aún.</p>
             <button
-              onClick={() => setModalOpen(true)}
+              onClick={() => router.push('/cuentas/nueva')}
               className="mt-3 text-sm text-accent hover:underline"
             >
               Crear la primera cuenta
@@ -174,72 +147,6 @@ export default function CuentasPage() {
           </table>
         )}
       </div>
-
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 backdrop-blur-sm">
-          <div className="bg-panel border border-separator rounded-xl shadow-xl w-full max-w-md mx-4">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-separator">
-              <h2 className="text-base font-semibold text-ink">Nueva cuenta</h2>
-              <button onClick={() => setModalOpen(false)} className="text-ink-muted hover:text-ink transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <form onSubmit={handleCreate} className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1.5">Nombre del cliente</label>
-                <input
-                  type="text"
-                  required
-                  value={form.nombre}
-                  onChange={(e) => setForm((f) => ({ ...f, nombre: e.target.value }))}
-                  placeholder="Ej. Café Colón"
-                  className="w-full px-3 py-2 text-sm bg-canvas border border-separator rounded-md text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1.5">Contacto</label>
-                <input
-                  type="text"
-                  required
-                  value={form.contacto}
-                  onChange={(e) => setForm((f) => ({ ...f, contacto: e.target.value }))}
-                  placeholder="Nombre del contacto"
-                  className="w-full px-3 py-2 text-sm bg-canvas border border-separator rounded-md text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-ink mb-1.5">Plan mensual (USD)</label>
-                <input
-                  type="number"
-                  required
-                  min="0"
-                  value={form.plan_mensual}
-                  onChange={(e) => setForm((f) => ({ ...f, plan_mensual: e.target.value }))}
-                  placeholder="1200"
-                  className="w-full px-3 py-2 text-sm bg-canvas border border-separator rounded-md text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition"
-                />
-              </div>
-              {error && <p className="text-sm text-danger">{error}</p>}
-              <div className="flex gap-3 pt-1">
-                <button
-                  type="button"
-                  onClick={() => setModalOpen(false)}
-                  className="flex-1 py-2 text-sm font-medium text-ink-muted border border-separator rounded-md hover:bg-canvas transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 py-2 text-sm font-medium text-white bg-accent hover:bg-accent-hover rounded-md disabled:opacity-60 transition-colors"
-                >
-                  {saving ? 'Guardando...' : 'Crear cuenta'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
